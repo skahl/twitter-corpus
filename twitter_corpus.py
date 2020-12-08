@@ -23,21 +23,18 @@ This file can then be processed and filtered as necessary to create a
 corpus of tweets for use with Machine Learning, Natural Language Processing,
 and other Human-Centered Computing applications.
 """
-from __future__ import print_function
 
 import sys
 import threading
-import Queue
+from multiprocessing import Queue
 import time
 import socket
-import httplib
 
 from tweepy import OAuthHandler
 from tweepy import Stream
 from tweepy.streaming import StreamListener
-from tweepy.utils import import_simplejson
 import staticconf
-json = import_simplejson()
+import simplejson as json
 
 
 # Configuration file that contains the Twitter API credentials.
@@ -62,7 +59,7 @@ class QueueListener(StreamListener):
         """Creates a new stream listener with an internal queue for tweets."""
         super(QueueListener, self).__init__()
         self.num_handled = 0
-        self.queue = Queue.Queue()
+        self.queue = Queue()
 
     def on_data(self, data):
         """Routes the raw stream data to the appropriate method."""
@@ -102,7 +99,7 @@ class QueueListener(StreamListener):
 def print_status(listener, seconds=5.0, last_count=0):
     """Call once to repeatedly display statistics every N seconds."""
     num_handled = listener.num_handled
-    qsize = listener.queue.qsize()
+    # qsize = listener.queue.len()
 
     t = threading.Timer(seconds, print_status, args=[listener, seconds,
                                                      num_handled])
@@ -118,8 +115,8 @@ def print_status(listener, seconds=5.0, last_count=0):
         ),
         file=sys.stderr,
     )
-    if qsize > 0:
-        print('QUEUE SIZE:', qsize, file=sys.stderr)
+    # if qsize > 0:
+    #     print('QUEUE SIZE:', qsize, file=sys.stderr)
 
 
 def worker(listener, flush_every=500):
@@ -128,7 +125,7 @@ def worker(listener, flush_every=500):
     while True:
         data = listener.queue.get()
         if data is None:
-            listener.queue.task_done()
+            # listener.queue.task_done()
             break
         try:
             print(data)
@@ -141,7 +138,7 @@ def worker(listener, flush_every=500):
         if count == flush_every:
             sys.stdout.flush()
             count = 0
-        listener.queue.task_done()
+        # listener.queue.task_done()
 
 
 def main():
@@ -167,11 +164,12 @@ def main():
     try:
         while True:
             try:
-                stream.sample()  # blocking!
+                # stream.sample()  # blocking!
+                stream.filter(track=["#airpodsmax"])
             except KeyboardInterrupt:
                 print('KEYBOARD INTERRUPT', file=sys.stderr)
                 return
-            except (socket.error, httplib.HTTPException):
+            except (socket.error):
                 global tcpip_delay
                 print(
                     'TCP/IP Error: Restarting after {delay} seconds.'.format(
@@ -187,7 +185,7 @@ def main():
         print('Waiting for last tweets to finish processing', file=sys.stderr)
         # Send poison pill to writer thread and wait for it to exit
         listener.queue.put(None)
-        listener.queue.join()
+        # listener.queue.join()
         print('Waiting for writer thread to finish', file=sys.stderr)
         writer_thread.join()
         print('Exit successful', file=sys.stderr)
